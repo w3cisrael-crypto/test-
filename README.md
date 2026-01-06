@@ -4,19 +4,29 @@
 
 ## סטטוס הפרויקט
 
-**שלב נוכחי: שלב 1 - MVP - איסוף נתונים בסיסי**
+**שלב נוכחי: שלב 2 - מנוע ניקוד והמלצות** ✅
 
 ✅ מבנה הפרויקט הוקם
 ✅ חיבור ל-Google Search Console
-⏳ מנוע ניקוד והמלצות (שלב 2)
+✅ מנוע ניקוד והמלצות (שלב 2)
 ⏳ מנוע תכנון חודשי (שלב 3)
 ⏳ ממשק משתמש (שלב 4)
 
-## תכונות שלב 1
+## תכונות מרכזיות
 
+### שלב 1 - איסוף נתונים ✅
 - **חיבור ל-Google Search Console API**: משיכת נתוני מילות מפתח אוטומטית
 - **ניתוח נתונים**: Clicks, Impressions, CTR, Position לכל שאילתה
-- **שמירת נתונים**: ייצוא לפורמט CSV לצורך ניתוח נוסף
+- **שמירת נתונים**: ייצוא לפורמט CSV
+
+### שלב 2 - מנוע ניקוד והמלצות ✅
+- **Opportunity Scoring**: ציון 0-100 לכל מילת מפתח על בסיס 3 רכיבים:
+  - פוטנציאל טראפיק (40%)
+  - מרחק נגיעה - מיקום (40%)
+  - Quick Wins - שיפור CTR (20%)
+- **ניקוי נתונים מתקדם**: סינון מותגים, נירמול, קטגוריזציה
+- **המלצות אוטומטיות**: המלצת פעולה לכל הזדמנות
+- **תובנות סטטיסטיות**: דוח מפורט עם מטריקות מרכזיות
 
 ## התקנה
 
@@ -54,29 +64,45 @@ pip install -r requirements.txt
 
 ## שימוש
 
-### בדיקה מהירה
-
-הרץ את המודול ישירות:
+### שימוש בסיסי - איסוף נתונים (שלב 1)
 
 ```bash
-python src/collectors/gsc_connector.py
+# איסוף נתונים פשוט
+python main.py --site https://example.com
+
+# עם שמירה לקובץ
+python main.py --site https://example.com --save
+
+# טווח תאריכים מותאם
+python main.py --site https://example.com --days 60
 ```
 
-### שימוש בסקריפט הראשי
+### שימוש מתקדם - ניתוח והמלצות (שלב 2)
 
 ```bash
-python main.py
+# ניתוח מלא עם המלצות
+python main.py --site https://example.com --analyze
+
+# עם סינון מילות מותג
+python main.py --site https://example.com --analyze \
+  --brand "שם החברה" "המותג"
+
+# התאמת תוצאות
+python main.py --site https://example.com --analyze \
+  --top 20 \           # הצג 20 הזדמנויות
+  --min-score 60 \     # ציון מינימלי
+  --save              # שמור לקובץ
 ```
 
-### שימוש כמודול
+### שימוש כספרייה
+
+#### שלב 1 - איסוף נתונים
 
 ```python
 from src.collectors import GSCConnector
 
 # יצירת מחבר
 connector = GSCConnector()
-
-# חיבור ל-API
 connector.connect()
 
 # משיכת נתונים
@@ -88,6 +114,31 @@ df = connector.fetch_data(
 
 # שמירת נתונים
 connector.save_data(df, "my_data.csv")
+```
+
+#### שלב 2 - ניקוד והמלצות
+
+```python
+from src.collectors import GSCConnector
+from src.logic import OpportunityScorer, rank_opportunities
+from src.utils import DataCleaner
+
+# 1. משיכת נתונים
+connector = GSCConnector()
+connector.connect()
+df = connector.fetch_data('https://example.com', '2024-01-01', '2024-01-31')
+
+# 2. ניקוי נתונים
+cleaner = DataCleaner(brand_keywords=['שם המותג'])
+df_clean = cleaner.clean_pipeline(df)
+
+# 3. חישוב ציונים
+scorer = OpportunityScorer()
+df_scored = scorer.score_dataframe(df_clean)
+
+# 4. דירוג והצגה
+top_opportunities = rank_opportunities(df_scored, top_n=10, min_score=70)
+print(top_opportunities[['query', 'opportunity_score', 'position']])
 ```
 
 ## מבנה הפרויקט

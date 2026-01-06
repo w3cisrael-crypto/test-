@@ -1,6 +1,11 @@
 """
 Logic Package
-מודולים לעיבוד ולוגיקה עסקית (שלבים 2-3)
+מודולים לעיבוד ולוגיקה עסקית
 """
-# TODO: שלב 2 - Scoring Engine
-# TODO: שלב 3 - Clustering & Planning
+from .scoring import OpportunityScorer, rank_opportunities, get_opportunity_insights
+
+__all__ = [
+    'OpportunityScorer',
+    'rank_opportunities',
+    'get_opportunity_insights'
+]

@@ -3,20 +3,23 @@ Super Agent - מערכת תכנון תוכן
 נקודת כניסה ראשית למערכת
 
 שלב 1: בדיקת חיבור ל-GSC ומשיכת נתונים בסיסית
+שלב 2: ניתוח והמלצות עם מנוע ניקוד
 """
 import argparse
 from datetime import datetime, timedelta
 from src.collectors import GSCConnector
+from src.logic.scoring import OpportunityScorer, rank_opportunities, get_opportunity_insights
+from src.utils.data_cleaning import DataCleaner
 
 
 def main():
     """
-    פונקציה ראשית - שלב 1
+    פונקציה ראשית - שלבים 1-2
     """
     print("=" * 60)
     print("Super Agent - מערכת תכנון תוכן אוטומטית")
     print("=" * 60)
-    print("שלב 1: איסוף נתונים מ-Google Search Console")
+    print("שלב 1-2: איסוף נתונים וניתוח הזדמנויות")
     print("=" * 60)
     print()
 
@@ -40,6 +43,29 @@ def main():
         '--save',
         action='store_true',
         help='שמירת הנתונים לקובץ CSV'
+    )
+    parser.add_argument(
+        '--analyze',
+        action='store_true',
+        help='הפעלת מנוע הניקוד והמלצות (שלב 2)'
+    )
+    parser.add_argument(
+        '--brand',
+        type=str,
+        nargs='+',
+        help='מילות מפתח של המותג לסינון (לדוגמה: "שם החברה" "המותג")'
+    )
+    parser.add_argument(
+        '--top',
+        type=int,
+        default=10,
+        help='מספר ההזדמנויות המובילות להצגה (ברירת מחדל: 10)'
+    )
+    parser.add_argument(
+        '--min-score',
+        type=float,
+        default=50.0,
+        help='ציון מינימלי להצגת הזדמנויות (ברירת מחדל: 50.0)'
     )
 
     args = parser.parse_args()
@@ -106,8 +132,92 @@ def main():
         print(f"  קליקים: {row['clicks']:,.0f} | חשיפות: {row['impressions']:,.0f} | "
               f"CTR: {row['ctr']:.2%} | מיקום: {row['position']:.1f}")
 
-    # שמירה לקובץ
-    if args.save:
+    # שלב 2: ניתוח והמלצות
+    if args.analyze:
+        print("\n" + "=" * 60)
+        print("שלב 2: ניתוח הזדמנויות")
+        print("=" * 60)
+
+        # ניקוי נתונים
+        cleaner = DataCleaner(brand_keywords=args.brand)
+        df_clean = cleaner.clean_pipeline(
+            df,
+            remove_brand=bool(args.brand),
+            min_impressions=10
+        )
+
+        if df_clean.empty:
+            print("\n✗ לא נותרו נתונים לאחר הניקוי")
+            return
+
+        # חישוב ציונים
+        print("\nמחשב ציוני הזדמנות...")
+        scorer = OpportunityScorer()
+        df_scored = scorer.score_dataframe(df_clean)
+
+        # דירוג
+        df_ranked = rank_opportunities(
+            df_scored,
+            top_n=args.top,
+            min_score=args.min_score
+        )
+
+        # הצגת תובנות
+        insights = get_opportunity_insights(df_scored)
+
+        print("\n" + "=" * 60)
+        print("תובנות כלליות")
+        print("=" * 60)
+        print(f"סה\"כ הזדמנויות: {insights.get('total_opportunities', 0)}")
+        print(f"ציון ממוצע: {insights.get('avg_score', 0):.1f}")
+        print(f"הזדמנויות גבוהות (75+): {insights.get('high_opportunities', 0)}")
+        print(f"הזדמנויות בינוניות (50-75): {insights.get('medium_opportunities', 0)}")
+        print(f"Quick Wins (שיפור CTR): {insights.get('quick_wins', 0)}")
+        print(f"מילות מפתח בעמוד 2: {insights.get('page_2_keywords', 0)}")
+
+        # הצגת ההזדמנויות המובילות
+        print("\n" + "=" * 60)
+        print(f"Top {len(df_ranked)} הזדמנויות (ציון {args.min_score}+)")
+        print("=" * 60)
+
+        for idx, row in df_ranked.iterrows():
+            print(f"\n🎯 #{idx+1}: {row['query']}")
+            print(f"   ציון כולל: {row['opportunity_score']:.1f}/100")
+            print(f"   מיקום: {row['position']:.1f} | "
+                  f"חשיפות: {row['impressions']:,.0f} | "
+                  f"קליקים: {row['clicks']:,.0f} | "
+                  f"CTR: {row['ctr']:.2%}")
+
+            # פירוט רכיבי הציון
+            print(f"   📊 פירוט: טראפיק={row['traffic_score']:.0f} | "
+                  f"מיקום={row['position_score']:.0f} | "
+                  f"Quick Win={row['quick_wins_score']:.0f}")
+
+            # המלצה
+            if row['quick_wins_score'] > 50:
+                print(f"   💡 המלצה: שפר כותרת ו-meta description לשיפור CTR")
+            elif row['position'] <= 10:
+                print(f"   💡 המלצה: הוסף תוכן איכותי ושפר את הדף הקיים")
+            elif row['position'] <= 20:
+                print(f"   💡 המלצה: צור תוכן מקיף חדש כדי להגיע לעמוד 1")
+            else:
+                print(f"   💡 המלצה: צור Pillar content ותוכן תומך")
+
+        # שמירת הנתונים המנותחים
+        if args.save:
+            print("\n" + "=" * 60)
+            # שמור את הנתונים המנותחים
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            analyzed_filename = f"analyzed_opportunities_{timestamp}.csv"
+
+            from config.settings import PROCESSED_DATA_DIR
+            filepath = PROCESSED_DATA_DIR / analyzed_filename
+
+            df_ranked.to_csv(filepath, index=False, encoding='utf-8-sig')
+            print(f"✓ הזדמנויות מנותחות נשמרו: {filepath}")
+
+    # שמירה לקובץ (נתונים גולמיים)
+    elif args.save:
         print("\n" + "=" * 60)
         filepath = connector.save_data(df)
         if filepath:
@@ -116,6 +226,9 @@ def main():
     print("\n" + "=" * 60)
     print("✓ השלמה בהצלחה!")
     print("=" * 60)
+
+    if not args.analyze:
+        print("\n💡 טיפ: הוסף --analyze כדי לקבל ניתוח מעמיק והמלצות!")
 
 
 if __name__ == "__main__":
