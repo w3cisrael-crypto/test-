@@ -7,12 +7,20 @@ from datetime import datetime, timedelta
 from googleapiclient.discovery import build
 from oauth2client.service_account import ServiceAccountCredentials
 import sys
+import json
 from pathlib import Path
 
 # הוסף את תיקיית הבסיס ל-PYTHONPATH
 sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from config.settings import GSC_SCOPES, GSC_KEY_FILE, DEFAULT_ROW_LIMIT
+
+# ניסיון לייבא streamlit לתמיכה ב-secrets
+try:
+    import streamlit as st
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
 
 
 class GSCConnector:
@@ -33,19 +41,51 @@ class GSCConnector:
     def connect(self):
         """
         יצירת חיבור ל-GSC API
+        תומך בשתי שיטות אימות:
+        1. Streamlit Secrets (מועדף ל-deployment)
+        2. קובץ JSON מקומי
         """
+        creds = None
+
+        # ניסיון 1: Streamlit Secrets (אם זמין)
+        if STREAMLIT_AVAILABLE and hasattr(st, 'secrets'):
+            try:
+                if 'gsc' in st.secrets and 'service_account_info' in st.secrets['gsc']:
+                    service_account_info = st.secrets['gsc']['service_account_info']
+                    # אם זה מחרוזת JSON, המר לdictionary
+                    if isinstance(service_account_info, str):
+                        service_account_info = json.loads(service_account_info)
+
+                    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+                        service_account_info,
+                        GSC_SCOPES
+                    )
+                    print("✓ נטען credentials מ-Streamlit Secrets")
+            except Exception as e:
+                print(f"⚠ לא ניתן לטעון מ-Streamlit Secrets: {str(e)}")
+
+        # ניסיון 2: קובץ JSON מקומי (fallback)
+        if creds is None:
+            try:
+                creds = ServiceAccountCredentials.from_json_keyfile_name(
+                    self.key_file,
+                    GSC_SCOPES
+                )
+                print(f"✓ נטען credentials מקובץ: {self.key_file}")
+            except FileNotFoundError:
+                print(f"✗ שגיאה: קובץ ה-credentials לא נמצא: {self.key_file}")
+                print("  אנא וודא שקובץ service-account.json קיים בתיקיית הפרויקט")
+                print("  או הגדר Streamlit Secrets ב-.streamlit/secrets.toml")
+                return False
+            except Exception as e:
+                print(f"✗ שגיאה בטעינת credentials: {str(e)}")
+                return False
+
+        # יצירת החיבור
         try:
-            creds = ServiceAccountCredentials.from_json_keyfile_name(
-                self.key_file,
-                GSC_SCOPES
-            )
             self.service = build('webmasters', 'v3', credentials=creds)
             print("✓ חיבור ל-Google Search Console הושלם בהצלחה")
             return True
-        except FileNotFoundError:
-            print(f"✗ שגיאה: קובץ ה-credentials לא נמצא: {self.key_file}")
-            print("  אנא וודא שקובץ service-account.json קיים בתיקיית הפרויקט")
-            return False
         except Exception as e:
             print(f"✗ שגיאה בחיבור ל-GSC: {str(e)}")
             return False

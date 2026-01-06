@@ -40,6 +40,7 @@ service-account.json
 .env
 .env.local
 config/credentials.json
+.streamlit/secrets.toml
 
 # Data files
 data/raw/*.csv
