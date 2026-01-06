@@ -4,22 +4,25 @@ Super Agent - מערכת תכנון תוכן
 
 שלב 1: בדיקת חיבור ל-GSC ומשיכת נתונים בסיסית
 שלב 2: ניתוח והמלצות עם מנוע ניקוד
+שלב 3: תכנון תוכן חודשי עם Clustering
 """
 import argparse
 from datetime import datetime, timedelta
 from src.collectors import GSCConnector
 from src.logic.scoring import OpportunityScorer, rank_opportunities, get_opportunity_insights
+from src.logic.clustering import KeywordClusterer, analyze_clusters
+from src.logic.planner import ContentPlanner, create_comprehensive_plan
 from src.utils.data_cleaning import DataCleaner
 
 
 def main():
     """
-    פונקציה ראשית - שלבים 1-2
+    פונקציה ראשית - שלבים 1-3
     """
     print("=" * 60)
     print("Super Agent - מערכת תכנון תוכן אוטומטית")
     print("=" * 60)
-    print("שלב 1-2: איסוף נתונים וניתוח הזדמנויות")
+    print("שלב 1-3: איסוף, ניתוח ותכנון תוכן")
     print("=" * 60)
     print()
 
@@ -66,6 +69,30 @@ def main():
         type=float,
         default=50.0,
         help='ציון מינימלי להצגת הזדמנויות (ברירת מחדל: 50.0)'
+    )
+    parser.add_argument(
+        '--plan',
+        action='store_true',
+        help='יצירת תוכנית תוכן חודשית (שלב 3)'
+    )
+    parser.add_argument(
+        '--num-articles',
+        type=int,
+        default=12,
+        help='מספר מאמרים לתוכנית החודשית (ברירת מחדל: 12)'
+    )
+    parser.add_argument(
+        '--strategy',
+        type=str,
+        default='balanced',
+        choices=['balanced', 'pillar_focused', 'quick_wins'],
+        help='אסטרטגיית תכנון: balanced (ברירת מחדל), pillar_focused, quick_wins'
+    )
+    parser.add_argument(
+        '--posts-per-week',
+        type=int,
+        default=3,
+        help='מספר פוסטים בשבוע ללוח הזמנים (ברירת מחדל: 3)'
     )
 
     args = parser.parse_args()
@@ -204,7 +231,7 @@ def main():
                 print(f"   💡 המלצה: צור Pillar content ותוכן תומך")
 
         # שמירת הנתונים המנותחים
-        if args.save:
+        if args.save and not args.plan:
             print("\n" + "=" * 60)
             # שמור את הנתונים המנותחים
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -215,6 +242,103 @@ def main():
 
             df_ranked.to_csv(filepath, index=False, encoding='utf-8-sig')
             print(f"✓ הזדמנויות מנותחות נשמרו: {filepath}")
+
+        # שלב 3: תכנון תוכן חודשי
+        if args.plan:
+            print("\n" + "=" * 60)
+            print("שלב 3: תכנון תוכן חודשי")
+            print("=" * 60)
+
+            # קיבוץ מילות מפתח
+            print("\nמקבץ מילות מפתח לנושאים...")
+            clusterer = KeywordClusterer(language='hebrew')
+            df_clustered = clusterer.cluster_keywords(df_scored)
+
+            # ניתוח קלאסטרים
+            cluster_analysis = analyze_clusters(df_clustered)
+
+            print(f"✓ נוצרו {cluster_analysis.get('num_clusters', 0)} קלאסטרים")
+            print(f"  ממוצע מילות מפתח בקלאסטר: {cluster_analysis.get('avg_keywords_per_cluster', 0):.1f}")
+
+            # הצג נושאי קלאסטרים
+            print("\n📋 נושאי קלאסטרים:")
+            for cluster_id in sorted(df_clustered['cluster_id'].unique()):
+                topic = clusterer.suggest_cluster_topic(df_clustered, cluster_id)
+                count = len(df_clustered[df_clustered['cluster_id'] == cluster_id])
+                print(f"  קלאסטר {cluster_id}: {topic} ({count} מילות מפתח)")
+
+            # יצירת תוכנית
+            print(f"\nבונה תוכנית תוכן עם {args.num_articles} מאמרים...")
+            print(f"אסטרטגיה: {args.strategy}")
+
+            plan_result = create_comprehensive_plan(
+                df_clustered,
+                num_articles=args.num_articles,
+                strategy=args.strategy,
+                posts_per_week=args.posts_per_week
+            )
+
+            plan_df = plan_result['plan']
+            summary = plan_result['summary']
+            briefs = plan_result['briefs']
+
+            # הצגת סיכום
+            print("\n" + "=" * 60)
+            print("סיכום התוכנית")
+            print("=" * 60)
+            print(f"סה\"כ מאמרים: {summary['total_articles']}")
+            print(f"  • Pillar (מאמרי עומק): {summary['pillar_articles']}")
+            print(f"  • Cluster (מאמרים תומכים): {summary['cluster_articles']}")
+            print(f"ציון הזדמנות ממוצע: {summary['avg_opportunity_score']:.1f}")
+            print(f"פוטנציאל חשיפות: {summary['total_potential_impressions']:,.0f}")
+            print(f"פוטנציאל קליקים: {summary['total_potential_clicks']:,.0f}")
+
+            # הצגת התוכנית
+            print("\n" + "=" * 60)
+            print("תוכנית תוכן חודשית")
+            print("=" * 60)
+
+            for idx, row in plan_df.iterrows():
+                week = row.get('week', '?')
+                date = row.get('suggested_date', '').strftime('%d/%m') if 'suggested_date' in row else '?'
+                priority = row.get('priority', idx + 1)
+                content_type = row['content_type']
+
+                # אייקון לפי סוג
+                icon = "📌" if content_type == "Pillar" else "📄"
+
+                print(f"\n{icon} שבוע {week} ({date}) - {content_type}")
+                print(f"   מילת מפתח: {row['query']}")
+                print(f"   ציון: {row['opportunity_score']:.1f} | מיקום: {row['position']:.1f} | "
+                      f"חשיפות: {row['impressions']:,.0f}")
+
+                # מצא את הבריף המתאים
+                brief = briefs[idx] if idx < len(briefs) else {}
+                if brief:
+                    print(f"   אורך מומלץ: {brief.get('recommended_length', 'N/A')}")
+                    print(f"   פעולה: {brief.get('action', 'N/A')}")
+
+            # שמירת התוכנית
+            if args.save:
+                print("\n" + "=" * 60)
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                plan_filename = f"content_plan_{timestamp}.csv"
+
+                from config.settings import PROCESSED_DATA_DIR
+                filepath = PROCESSED_DATA_DIR / plan_filename
+
+                plan_df.to_csv(filepath, index=False, encoding='utf-8-sig')
+                print(f"✓ תוכנית תוכן נשמרה: {filepath}")
+
+                # שמור גם את הבריפים
+                import json
+                briefs_filename = f"content_briefs_{timestamp}.json"
+                briefs_filepath = PROCESSED_DATA_DIR / briefs_filename
+
+                with open(briefs_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(briefs, f, ensure_ascii=False, indent=2)
+
+                print(f"✓ בריפים נשמרו: {briefs_filepath}")
 
     # שמירה לקובץ (נתונים גולמיים)
     elif args.save:
@@ -229,6 +353,9 @@ def main():
 
     if not args.analyze:
         print("\n💡 טיפ: הוסף --analyze כדי לקבל ניתוח מעמיק והמלצות!")
+
+    if args.analyze and not args.plan:
+        print("💡 טיפ: הוסף --plan ליצירת תוכנית תוכן חודשית מלאה!")
 
 
 if __name__ == "__main__":

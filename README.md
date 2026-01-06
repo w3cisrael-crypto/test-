@@ -4,12 +4,12 @@
 
 ## סטטוס הפרויקט
 
-**שלב נוכחי: שלב 2 - מנוע ניקוד והמלצות** ✅
+**שלב נוכחי: שלב 3 - תכנון תוכן חודשי** ✅
 
 ✅ מבנה הפרויקט הוקם
 ✅ חיבור ל-Google Search Console
 ✅ מנוע ניקוד והמלצות (שלב 2)
-⏳ מנוע תכנון חודשי (שלב 3)
+✅ מנוע תכנון חודשי (שלב 3)
 ⏳ ממשק משתמש (שלב 4)
 
 ## תכונות מרכזיות
@@ -27,6 +27,16 @@
 - **ניקוי נתונים מתקדם**: סינון מותגים, נירמול, קטגוריזציה
 - **המלצות אוטומטיות**: המלצת פעולה לכל הזדמנות
 - **תובנות סטטיסטיות**: דוח מפורט עם מטריקות מרכזיות
+
+### שלב 3 - תכנון תוכן חודשי ✅
+- **Clustering**: קיבוץ אוטומטי של מילות מפתח דומות למניעת קניבליזציה
+- **תכנון אסטרטגי**: בניית תוכנית חודשית עם איזון Pillar/Cluster (30/70)
+- **3 אסטרטגיות תכנון**:
+  - Balanced: איזון אופטימלי בין תוכן עומק לתוכן תומך
+  - Pillar Focused: דגש על תוכן עומק (50/50)
+  - Quick Wins: התמקדות בהזדמנויות מהירות
+- **לוח זמנים אוטומטי**: הצעת תאריכי פרסום מותאמים
+- **Content Briefs**: בריף מלא לכל מאמר (אורך, עומק, פעולות)
 
 ## התקנה
 
@@ -94,6 +104,25 @@ python main.py --site https://example.com --analyze \
   --save              # שמור לקובץ
 ```
 
+### תכנון תוכן חודשי (שלב 3)
+
+```bash
+# תוכנית תוכן חודשית מלאה
+python main.py --site https://example.com --analyze --plan
+
+# תוכנית עם התאמות
+python main.py --site https://example.com --analyze --plan \
+  --num-articles 15 \      # 15 מאמרים לחודש
+  --strategy pillar_focused \  # דגש על Pillar
+  --posts-per-week 4 \     # 4 פוסטים בשבוע
+  --save                   # שמור תוכנית ובריפים
+
+# אסטרטגיית Quick Wins
+python main.py --site https://example.com --analyze --plan \
+  --strategy quick_wins \
+  --num-articles 10
+```
+
 ### שימוש כספרייה
 
 #### שלב 1 - איסוף נתונים
@@ -141,6 +170,32 @@ top_opportunities = rank_opportunities(df_scored, top_n=10, min_score=70)
 print(top_opportunities[['query', 'opportunity_score', 'position']])
 ```
 
+#### שלב 3 - תכנון תוכן
+
+```python
+from src.logic import KeywordClusterer, ContentPlanner, create_comprehensive_plan
+
+# 1. קיבוץ מילות מפתח
+clusterer = KeywordClusterer(language='hebrew')
+df_clustered = clusterer.cluster_keywords(df_scored)
+
+# 2. יצירת תוכנית מקיפה
+plan_result = create_comprehensive_plan(
+    df_clustered,
+    num_articles=12,
+    strategy='balanced',
+    posts_per_week=3
+)
+
+# 3. גישה לתוכנית והבריפים
+plan_df = plan_result['plan']
+briefs = plan_result['briefs']
+summary = plan_result['summary']
+
+print(f"נוצרו {summary['total_articles']} מאמרים")
+print(f"Pillar: {summary['pillar_articles']}, Cluster: {summary['cluster_articles']}")
+```
+
 ## מבנה הפרויקט
 
 ```
@@ -150,57 +205,20 @@ seo_planner_agent/
 │   └── clients_config.yaml      # הגדרות לקוחות
 ├── data/
 │   ├── raw/                     # נתונים גולמיים
-│   └── processed/               # נתונים מעובדים
+│   └── processed/               # נתונים מעובדים + תוכניות
 ├── src/
 │   ├── collectors/              # מודולי איסוף נתונים
 │   │   └── gsc_connector.py     # חיבור ל-GSC (שלב 1) ✅
-│   ├── logic/                   # לוגיקה עסקית (שלב 2-3)
-│   └── utils/                   # כלי עזר
-├── tests/                       # בדיקות
+│   ├── logic/                   # לוגיקה עסקית
+│   │   ├── scoring.py           # מנוע ניקוד (שלב 2) ✅
+│   │   ├── clustering.py        # קיבוץ מילות מפתח (שלב 3) ✅
+│   │   └── planner.py           # תכנון תוכן (שלב 3) ✅
+│   └── utils/
+│       └── data_cleaning.py     # ניקוי נתונים (שלב 2) ✅
+├── tests/                       # בדיקות אוטומטיות
 ├── main.py                      # נקודת כניסה
 └── requirements.txt             # תלויות
 ```
-
-## הגדרת Google Search Console API
-
-1. **צור פרויקט ב-Google Cloud Console**
-   - גש ל-[Google Cloud Console](https://console.cloud.google.com/)
-   - צור פרויקט חדש
-
-2. **הפעל את Search Console API**
-   - בתפריט, עבור ל-"APIs & Services" > "Library"
-   - חפש "Google Search Console API"
-   - לחץ "Enable"
-
-3. **צור Service Account**
-   - עבור ל-"APIs & Services" > "Credentials"
-   - לחץ "Create Credentials" > "Service Account"
-   - מלא את הפרטים והורד את קובץ ה-JSON
-
-4. **הוסף הרשאות ב-Search Console**
-   - גש ל-[Search Console](https://search.google.com/search-console)
-   - בחר את האתר שלך
-   - Settings > Users and permissions
-   - הוסף את כתובת ה-email של ה-Service Account
-
-## טיפים לשימוש
-
-### מניעת שימוש יתר ב-API
-- השתמש ב-Caching: שמור נתונים מקומית
-- הגדר טווחי תאריכים סבירים
-- הימנע מריצות מרובות על אותם תאריכים
-
-### אבטחה
-- **לעולם אל תעלה את `service-account.json` ל-Git**
-- שמור מפתחות API במשתני סביבה
-- השתמש ב-`.env` לפיתוח מקומי
-
-## שלבים הבאים
-
-- [ ] **שלב 2**: מנוע ניקוד והמלצות
-- [ ] **שלב 3**: מנוע תכנון חודשי עם Clustering
-- [ ] **שלב 4**: Dashboard עם Streamlit
-- [ ] **שלב 5**: ייצוא ושיתוף תוכניות
 
 ## תרומה
 
