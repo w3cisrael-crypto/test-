@@ -1,0 +1,21 @@
+# הגדרות ספציפיות לכל לקוח
+# דוגמה לשימוש:
+
+# clients:
+#   - name: "Client A"
+#     site_url: "https://example-a.com"
+#     niche: "טכנולוגיה"
+#     monthly_articles: 8
+#     focus_areas:
+#       - "מדריכים טכניים"
+#       - "חדשות תעשייה"
+#
+#   - name: "Client B"
+#     site_url: "https://example-b.com"
+#     niche: "בריאות"
+#     monthly_articles: 5
+#     focus_areas:
+#       - "תזונה"
+#       - "כושר"
+
+clients: []
