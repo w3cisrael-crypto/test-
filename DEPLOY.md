@@ -2,7 +2,84 @@
 
 מדריך פשוט ומפורט להעלאת מערכת Super Agent לאינטרנט בחינם!
 
-## אפשרות 1: Streamlit Cloud (מומלץ למתחילים) ⭐
+---
+
+## ⚡ שיטה קלה ומהירה (ללא API!) - חדש! 🆕
+
+**הדרך הכי פשוטה להתחיל:**
+
+1. **העלה את הקוד ל-Streamlit Cloud** (ראה למטה)
+2. **הורד CSV מ-Search Console** (ראה [מדריך פשוט](HOW_TO_EXPORT_GSC.md))
+3. **העלה את הקובץ באפליקציה** - זהו!
+
+**יתרונות:**
+- ✅ **אין צורך ב-Google Cloud** או Service Account
+- ✅ **אין צורך ב-Secrets** או credentials
+- ✅ **פשוט להעלות ל-Streamlit Cloud** - רק הקוד
+- ✅ **בטוח יותר** - אין גישה ל-API
+- ✅ **מהיר** - 5 דקות סה"כ
+
+**חסרון יחיד:**
+- ⚠️ צריך להוריד קובץ חדש מ-GSC כל פעם (לא אוטומטי)
+
+אם השיטה הזו מתאימה לך, דלג ישר ל**"אפשרות 1: Streamlit Cloud - העלאה פשוטה"** למטה.
+
+---
+
+## אפשרות 1: Streamlit Cloud - העלאה פשוטה (ללא API) ⭐
+
+השיטה הזו **לא דורשת** הגדרת Google Cloud או Service Account!
+
+### שלב 1: העלה את הקוד ל-GitHub
+
+1. **אם יש לך חשבון GitHub**:
+   ```bash
+   git push origin claude/content-planning-stage-1-UtjTj
+   ```
+
+2. **אם אין לך חשבון GitHub**:
+   - גש ל-https://github.com
+   - לחץ "Sign up"
+   - מלא פרטים ואמת מייל
+   - צור repository חדש
+   - העלה את הקוד
+
+### שלב 2: פריסה ל-Streamlit Cloud
+
+1. **גש ל-Streamlit Cloud**:
+   - https://share.streamlit.io
+
+2. **התחבר עם GitHub**:
+   - לחץ "Sign up"
+   - בחר "Continue with GitHub"
+   - אשר הרשאות
+
+3. **צור אפליקציה**:
+   - לחץ "New app"
+   - בחר את ה-repository שלך
+   - בחר branch: `claude/content-planning-stage-1-UtjTj`
+   - Main file: `app.py`
+   - לחץ "Deploy"
+
+4. **המתן להעלאה** (1-3 דקות)
+
+5. **זהו!** תקבל קישור כמו: `https://your-app.streamlit.app`
+
+### שלב 3: שימוש באפליקציה
+
+1. **פתח את הקישור** שקיבלת
+2. **בסרגל הצד**, בחר **"📁 העלה קובץ CSV (פשוט)"**
+3. **הורד CSV מ-Search Console** ([מדריך מפורט](HOW_TO_EXPORT_GSC.md))
+4. **העלה את הקובץ**
+5. **לחץ "טען נתונים"** - זהו!
+
+**זה הכל! אפליקציה פועלת באינטרנט ללא הגדרות מורכבות!** 🎉
+
+---
+
+## אפשרות 2: Streamlit Cloud עם API (למתקדמים) 🔌
+
+אם אתה רוצה שהמערכת תמשוך נתונים **אוטומטית** מ-GSC (ללא הורדה ידנית), תצטרך להגדיר API.
 
 Streamlit Cloud הוא שירות חינמי שמאפשר לך להריץ את המערכת באינטרנט תוך דקות ספורות.
 

@@ -80,8 +80,8 @@ def init_session_state():
         st.session_state.plan_result = None
 
 
-def load_data(site_url: str, days: int, brand_keywords: list) -> tuple:
-    """טעינת נתונים מ-GSC וניתוח"""
+def load_data_from_api(site_url: str, days: int, brand_keywords: list) -> tuple:
+    """טעינת נתונים מ-GSC API וניתוח"""
     with st.spinner('🔄 מתחבר ל-Google Search Console...'):
         connector = GSCConnector()
         if not connector.connect():
@@ -98,6 +98,38 @@ def load_data(site_url: str, days: int, brand_keywords: list) -> tuple:
     if df.empty:
         st.error("❌ לא נמצאו נתונים לתקופה המבוקשת.")
         return None, None, None
+
+    return process_data(df, brand_keywords)
+
+
+def load_data_from_file(uploaded_file, brand_keywords: list) -> tuple:
+    """טעינת נתונים מקובץ CSV וניתוח"""
+    with st.spinner('📂 קורא קובץ...'):
+        try:
+            df = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"❌ שגיאה בקריאת הקובץ: {str(e)}")
+            return None, None, None
+
+    # בדיקת עמודות נדרשות
+    required_columns = ['query', 'clicks', 'impressions', 'ctr', 'position']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+
+    if missing_columns:
+        st.error(f"❌ חסרות עמודות נדרשות בקובץ: {', '.join(missing_columns)}")
+        st.info("💡 ודא שהורדת את הקובץ מ-Search Console עם כל העמודות הנדרשות")
+        return None, None, None
+
+    if df.empty:
+        st.error("❌ הקובץ ריק.")
+        return None, None, None
+
+    return process_data(df, brand_keywords)
+
+
+def process_data(df: pd.DataFrame, brand_keywords: list) -> tuple:
+    """עיבוד וניתוח הנתונים"""
+    df_raw = df.copy()
 
     # ניקוי
     with st.spinner('🧹 מנקה ומעבד נתונים...'):
@@ -124,7 +156,7 @@ def load_data(site_url: str, days: int, brand_keywords: list) -> tuple:
 
     st.success('✅ הנתונים נטענו בהצלחה!')
 
-    return df, df_scored, df_clustered
+    return df_raw, df_scored, df_clustered
 
 
 def display_overview(df_scored: pd.DataFrame):
@@ -365,24 +397,61 @@ def main():
     with st.sidebar:
         st.markdown("## ⚙️ הגדרות")
 
-        site_url = st.text_input(
-            "כתובת אתר",
-            placeholder="https://example.com",
-            help="כתובת האתר ב-Search Console"
+        # בחירת שיטת טעינה
+        data_source = st.radio(
+            "מקור נתונים",
+            options=["📁 העלה קובץ CSV (פשוט)", "🔌 חיבור API (מתקדם)"],
+            help="בחר איך להעלות את הנתונים"
         )
 
-        days = st.slider(
-            "תקופת נתונים (ימים)",
-            min_value=7,
-            max_value=90,
-            value=30,
-            help="כמה ימים אחורה למשוך נתונים"
-        )
+        st.markdown("---")
+
+        # הגדרות לפי סוג המקור
+        if data_source == "📁 העלה קובץ CSV (פשוט)":
+            st.markdown("### 📤 העלאת קובץ")
+            st.markdown("""
+            **איך להוריד קובץ מ-Search Console:**
+            1. גש ל-[Search Console](https://search.google.com/search-console)
+            2. בחר את האתר שלך
+            3. לחץ על "Performance" (ביצועים)
+            4. גלול למטה וראה את הטבלה
+            5. לחץ על ה-Export (📥) ולחץ "Download CSV"
+            """)
+
+            uploaded_file = st.file_uploader(
+                "בחר קובץ CSV",
+                type=['csv'],
+                help="קובץ CSV שהורדת מ-Search Console"
+            )
+
+            site_url = None
+            days = None
+
+        else:  # API
+            st.markdown("### 🔌 חיבור API")
+
+            site_url = st.text_input(
+                "כתובת אתר",
+                placeholder="https://example.com",
+                help="כתובת האתר ב-Search Console"
+            )
+
+            days = st.slider(
+                "תקופת נתונים (ימים)",
+                min_value=7,
+                max_value=180,
+                value=30,
+                help="כמה ימים אחורה למשוך נתונים"
+            )
+
+            uploaded_file = None
+
+        st.markdown("---")
 
         brand_keywords = st.text_input(
             "מילות מותג (הפרד בפסיקים)",
             placeholder="שם החברה, המותג",
-            help="מילות מפתח של המותג לסינון"
+            help="מילות מפתח של המותג לסינון (אופציונלי)"
         )
 
         brand_list = [kw.strip() for kw in brand_keywords.split(',')] if brand_keywords else []
@@ -423,16 +492,29 @@ def main():
 
     # טעינת נתונים
     if load_button:
-        if not site_url:
-            st.error("❌ אנא הזן כתובת אתר")
-        else:
-            df_raw, df_scored, df_clustered = load_data(site_url, days, brand_list)
+        if data_source == "📁 העלה קובץ CSV (פשוט)":
+            if not uploaded_file:
+                st.error("❌ אנא העלה קובץ CSV")
+            else:
+                df_raw, df_scored, df_clustered = load_data_from_file(uploaded_file, brand_list)
 
-            if df_scored is not None:
-                st.session_state.data_loaded = True
-                st.session_state.df_raw = df_raw
-                st.session_state.df_scored = df_scored
-                st.session_state.df_clustered = df_clustered
+                if df_scored is not None:
+                    st.session_state.data_loaded = True
+                    st.session_state.df_raw = df_raw
+                    st.session_state.df_scored = df_scored
+                    st.session_state.df_clustered = df_clustered
+
+        else:  # API
+            if not site_url:
+                st.error("❌ אנא הזן כתובת אתר")
+            else:
+                df_raw, df_scored, df_clustered = load_data_from_api(site_url, days, brand_list)
+
+                if df_scored is not None:
+                    st.session_state.data_loaded = True
+                    st.session_state.df_raw = df_raw
+                    st.session_state.df_scored = df_scored
+                    st.session_state.df_clustered = df_clustered
 
     # הצגת תוצאות
     if st.session_state.data_loaded:
@@ -462,28 +544,39 @@ def main():
                 display_content_plan(st.session_state.plan_result)
 
     else:
-        st.info("👈 הזן את פרטי האתר בסרגל הצד והקלק על 'טען נתונים' להתחלה")
+        st.info("👈 בחר מקור נתונים בסרגל הצד והקלק על 'טען נתונים' להתחלה")
 
         # הצגת דוגמה
         with st.expander("💡 איך זה עובד?"):
             st.markdown("""
             ### תהליך העבודה:
 
-            1. **הזן כתובת אתר** מ-Google Search Console
-            2. **בחר תקופת נתונים** (מומלץ 30-90 ימים)
-            3. **הוסף מילות מותג** (אופציונלי) לסינון
-            4. **הקלק על 'טען נתונים'** - המערכת תעשה:
-               - משיכת נתונים מ-GSC
-               - ניקוי וסינון
-               - חישוב ציוני הזדמנות
-               - קיבוץ מילות מפתח
-            5. **עבור בין הטאבים** לניתוח
-            6. **צור תוכנית תוכן** מותאמת אישית
-            7. **הורד את התוכנית** ל-CSV או JSON
+            **אפשרות 1: העלאת קובץ (מומלץ למתחילים)**
+            1. **הורד CSV** מ-Google Search Console:
+               - גש ל-Search Console → Performance
+               - גלול למטה לטבלה
+               - לחץ Export → Download CSV
+            2. **העלה את הקובץ** בסרגל הצד
+            3. **הוסף מילות מותג** (אופציונלי)
+            4. **לחץ 'טען נתונים'**
 
-            ### דרישות:
-            - קובץ `service-account.json` בתיקיית הפרויקט
-            - גישה ל-Search Console API
+            **אפשרות 2: חיבור API (מתקדם)**
+            1. **הזן כתובת אתר** מ-Search Console
+            2. **בחר תקופת נתונים** (30-90 ימים)
+            3. **הוסף מילות מותג** (אופציונלי)
+            4. **לחץ 'טען נתונים'**
+            5. דרישות: Service Account + API מופעל
+
+            ### המערכת תבצע:
+            - ניקוי וסינון נתונים
+            - חישוב ציוני הזדמנות
+            - קיבוץ מילות מפתח
+            - ניתוח והמלצות
+
+            ### שלבים הבאים:
+            1. **עבור בין הטאבים** לניתוח מעמיק
+            2. **צור תוכנית תוכן** מותאמת אישית
+            3. **הורד את התוכנית** ל-CSV או JSON
             """)
 
 
